@@ -1,75 +1,122 @@
 "use client"
 import { useState, useRef, Suspense, useEffect } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Stars, ScrollControls, useScroll, Text, Float, Sparkles, PerspectiveCamera, OrbitControls } from '@react-three/drei'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { Stars, ScrollControls, useScroll, Text, Float, OrbitControls, Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 
-// --- Realistic Gargantua (Shader එක optimization කළා ලෝඩ් වෙන්න ලේසි වෙන්න) ---
+// --- 🔥 THE REAL THICK PLASMA SHADER ---
+const ThickGargantuaMaterial = {
+  uniforms: {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color("#ffaa00") }, // Bright Orange-Yellow
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vPosition;
+    void main() {
+      vUv = uv;
+      vPosition = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec2 vUv;
+    uniform float uTime;
+    uniform vec3 uColor;
+
+    // Fast noise for plasma movement
+    float noise(vec3 p) {
+      return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+    }
+
+    void main() {
+      float d = distance(vUv, vec2(0.5));
+      
+      // Creating a thick, organic-looking ring
+      float ring = smoothstep(0.15, 0.25, d) * (1.0 - smoothstep(0.48, 0.5, d));
+      
+      // Moving plasma effect
+      float movement = noise(vec3(vUv * 8.0, uTime * 0.4));
+      float fire = ring * (0.7 + 0.5 * movement);
+      
+      // Color Intensity - මහතට සහ තදට පේන්න
+      vec3 finalColor = uColor * fire * 4.0; 
+      finalColor += vec3(1.0, 0.8, 0.4) * pow(fire, 4.0); // Bright center of the fire
+      
+      gl_FragColor = vec4(finalColor, fire * 1.5);
+    }
+  `
+}
+
 function Gargantua() {
-  const diskRef = useRef<THREE.Mesh>(null!)
-  
+  const mainDiskRef = useRef<THREE.Mesh>(null!)
+  const lensingDiskRef = useRef<THREE.Mesh>(null!)
+
   useFrame((state) => {
-    if (diskRef.current) {
-      diskRef.current.rotation.z += 0.01 // හෙමින් කැරකෙන ගතිය
+    const t = state.clock.getElapsedTime()
+    if (mainDiskRef.current) {
+      mainDiskRef.current.rotation.z = t * 0.05
+      ;(mainDiskRef.current.material as any).uniforms.uTime.value = t
+    }
+    if (lensingDiskRef.current) {
+      lensingDiskRef.current.rotation.z = -t * 0.03
+      ;(lensingDiskRef.current.material as any).uniforms.uTime.value = t
     }
   })
 
   return (
-    <group position={[0, 0, 0]}>
-      {/* 1. මධ්‍යයේ කළු බෝලය */}
+    <group>
+      {/* 1. Black Core */}
       <mesh>
-        <sphereGeometry args={[5, 32, 32]} />
+        <sphereGeometry args={[5, 64, 64]} />
         <meshBasicMaterial color="black" />
       </mesh>
 
-      {/* 2. Accretion Disk - රූපේ විදිහටම දිලිසෙන වලල්ල */}
-      <mesh ref={diskRef} rotation={[Math.PI / 2.1, 0, 0]}>
-        <torusGeometry args={[10, 1.2, 2, 80]} />
-        <meshStandardMaterial 
-          color="#ff8800" 
-          emissive="#ff4400" 
-          emissiveIntensity={10} 
+      {/* 2. මහත ගින්දර වලල්ල (Main Disk) */}
+      <mesh ref={mainDiskRef} rotation={[Math.PI / 2.1, 0, 0]}>
+        <planeGeometry args={[45, 45]} />
+        <shaderMaterial 
+          args={[ThickGargantuaMaterial]} 
           transparent 
-          opacity={0.9} 
+          side={THREE.DoubleSide} 
+          blending={THREE.AdditiveBlending} 
         />
       </mesh>
 
-      {/* 3. Outer Glow (Gravitational Lensing) */}
-      <mesh>
-        <sphereGeometry args={[11, 32, 32]} />
-        <meshBasicMaterial color="#ffaa00" transparent opacity={0.1} side={THREE.BackSide} />
+      {/* 3. Gravitational Lensing (The Curved Part) */}
+      <mesh ref={lensingDiskRef} rotation={[0, 0, 0]}>
+        <planeGeometry args={[42, 42]} />
+        <shaderMaterial 
+          args={[ThickGargantuaMaterial]} 
+          transparent 
+          side={THREE.DoubleSide} 
+          blending={THREE.AdditiveBlending} 
+        />
       </mesh>
-      
-      <Sparkles count={2000} scale={30} size={2} speed={1} color="#ffaa00" />
+
+      <Sparkles count={4000} scale={60} size={2} speed={0.5} color="#ffcc00" />
     </group>
   )
 }
 
-function SceneContent() {
+function Scene() {
   const scroll = useScroll()
-  const { camera } = useThree()
-  
-  useFrame(() => {
-    // Zoom in/out based on scroll
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, 60 - scroll.offset * 120, 0.05)
+  useFrame((state) => {
+    // සිරාවටම ඇතුළට යන Zoom එක
+    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, 90 - scroll.offset * 160, 0.05)
+    state.camera.lookAt(0, 0, 0)
   })
 
   return (
     <>
       <color attach="background" args={['#000']} />
-      {/* Lights වැඩි කරා Dark Screen එක නැති කරන්න */}
-      <ambientLight intensity={2} />
-      <pointLight position={[0, 0, 0]} intensity={20} color="#ffaa00" />
-      <Stars radius={400} count={20000} factor={8} fade speed={1.5} />
-      
-      {/* 360 Camera View */}
+      <Stars radius={400} count={50000} factor={12} fade speed={1.5} />
       <OrbitControls enableZoom={false} enablePan={false} makeDefault />
-
       <Gargantua />
-
-      <group position={[0, 0, -80]}>
+      
+      <group position={[0, 0, -130]}>
         <Float>
-          <Text fontSize={4} color="#00d4ff" textAlign="center">NEXT WEB{"\n"}SOLUTIONS</Text>
+          <Text fontSize={8} color="#00d4ff" font="/fonts/bold.ttf">BEYOND REALITY</Text>
         </Float>
       </group>
     </>
@@ -78,41 +125,40 @@ function SceneContent() {
 
 export default function App() {
   const [hasEntered, setHasEntered] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  if (!isMounted) return null
+  const handleEnter = () => {
+    setHasEntered(true)
+    if (audioRef.current) {
+      audioRef.current.volume = 0.5
+      audioRef.current.play().catch(e => console.log("Music Error:", e))
+    }
+  }
 
   return (
-    <main className="w-full h-screen bg-black overflow-hidden relative">
+    <main className="w-full h-screen bg-black relative">
       <audio ref={audioRef} src="/interstellar.mp3" loop />
 
       {!hasEntered ? (
         <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black">
-          <h1 className="text-6xl md:text-8xl font-black text-white text-center mb-10 tracking-tighter">
+          <h1 className="text-6xl md:text-9xl font-black text-white text-center mb-10 tracking-tighter">
             NEXT WEB<br/><span className="text-[#00d4ff]">SOLUTIONS</span>
           </h1>
           <button 
-            onClick={() => { setHasEntered(true); audioRef.current?.play(); }}
-            className="px-14 py-5 border-2 border-[#ffaa00] text-[#ffaa00] font-bold tracking-[8px] hover:bg-[#ffaa00] hover:text-black transition-all duration-500"
+            onClick={handleEnter}
+            className="px-20 py-8 border-2 border-[#ffaa00] text-[#ffaa00] font-bold tracking-[12px] hover:bg-[#ffaa00] hover:text-black transition-all duration-700 uppercase"
           >
-            ENTER THE FUTURE
+            Enter Experience
           </button>
         </div>
       ) : (
-        <div className="absolute inset-0 z-10">
-          <Canvas dpr={[1, 1.5]} camera={{ position: [0, 10, 60], fov: 75 }}>
-            <Suspense fallback={null}>
-              <ScrollControls pages={6} damping={0.2}>
-                <SceneContent />
-              </ScrollControls>
-            </Suspense>
-          </Canvas>
-        </div>
+        <Canvas camera={{ position: [0, 20, 90], fov: 60 }}>
+          <Suspense fallback={null}>
+            <ScrollControls pages={25} damping={0.3}>
+              <Scene />
+            </ScrollControls>
+          </Suspense>
+        </Canvas>
       )}
     </main>
   )
