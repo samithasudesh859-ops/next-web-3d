@@ -1,47 +1,59 @@
 "use client"
 import { useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Stars, ScrollControls, useScroll, Float, Text, Sphere } from '@react-three/drei'
+import { Stars, ScrollControls, useScroll, Float, Text, Sphere, MeshDistortMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 
 function SceneContent() {
   const scroll = useScroll()
   const meshRef = useRef<THREE.Mesh>(null!)
+  const groupRef = useRef<THREE.Group>(null!)
 
   useFrame((state) => {
     if (!scroll) return
 
-    // 🏎️ 1. ZOOM EFFECT (කැමරාව ඇතුළට යනවා)
-    // Scroll කරද්දී කැමරාව Z: 5 ඉඳන් Z: -50 දක්වා වේගයෙන් යනවා
-    state.camera.position.z = 5 - (scroll.offset * 60)
+    // 🏎️ 1. SMOOTH ZOOM (Lerp පාවිච්චි කරලා)
+    const targetZ = 5 - (scroll.offset * 80)
+    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, targetZ, 0.05)
 
-    // 🚀 2. Cam Parallax (Mouse එකට පොඩ්ඩක් හැරෙනවා)
-    state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, state.mouse.x * 2, 0.05)
-    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, state.mouse.y * 2, 0.05)
-    
-    // බෝලය කැරකෙන්න දෙමු
+    // 🚀 2. REALISTIC CAMERA SWAY (Mouse එකට හරිම සිනිදුවට හැරෙන්නේ)
+    const targetX = state.mouse.x * 3
+    const targetY = state.mouse.y * 2
+    state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, targetX, 0.03)
+    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, targetY, 0.03)
+    state.camera.lookAt(0, 0, targetZ - 10)
+
+    // 🔄 බෝලය කැරකෙන වේගය Scroll එක අනුව වැඩි කරමු
     if (meshRef.current) {
-      meshRef.current.rotation.y += 0.01
+      meshRef.current.rotation.y += 0.01 + (scroll.offset * 0.1)
     }
   })
 
   return (
     <>
-      {/* තරු ගොඩක් ඈතට යනකම් විහිදෙන්න දැම්මා */}
-      <Stars radius={100} depth={200} count={10000} factor={6} saturation={0} fade speed={2} />
+      <Stars radius={100} depth={200} count={12000} factor={6} saturation={0} fade speed={2} />
       
-      <Float speed={3} rotationIntensity={0.5} floatIntensity={1}>
-        <Sphere ref={meshRef} args={[1.2, 32, 32]} position={[0, 0, -5]}>
-          <meshStandardMaterial color="#00d4ff" />
+      <Float speed={2} rotationIntensity={1} floatIntensity={2}>
+        <Sphere ref={meshRef} args={[1.5, 64, 64]} position={[0, 0, -5]}>
+          {/* 💎 මේ Material එකෙන් බෝලය දිලිසෙන "Energy Ball" එකක් වගේ වෙනවා */}
+          <MeshDistortMaterial 
+            color="#00f2ff" 
+            speed={3} 
+            distort={0.3} 
+            radius={1}
+            emissive="#005e73"
+            emissiveIntensity={2}
+          />
         </Sphere>
       </Float>
 
-      <Text fontSize={0.8} color="white" position={[0, 0, -2]}>
+      <Text fontSize={1} color="white" position={[0, 0, -2]} font="/fonts/Geist-Bold.ttf">
         NEXT WEB
       </Text>
 
-      <ambientLight intensity={1.5} />
-      <pointLight position={[10, 10, 10]} intensity={2} />
+      <ambientLight intensity={0.5} />
+      <pointLight position={[10, 10, 10]} intensity={5} color="#00f2ff" />
+      <spotLight position={[-10, -10, -10]} intensity={2} color="#ff00ea" />
     </>
   )
 }
@@ -49,9 +61,9 @@ function SceneContent() {
 export default function WarpBackground() {
   return (
     <div className="fixed inset-0 h-screen w-screen bg-black">
-      {/* pages={15} දැම්මා ගොඩක් දුර යන්න පුළුවන් වෙන්න */}
       <Canvas camera={{ position: [0, 0, 5], fov: 75 }}>
-        <ScrollControls pages={15} damping={0.1}>
+        {/* damping={0.3} නිසා scroll එක හරිම smooth වෙනවා */}
+        <ScrollControls pages={8} damping={0.3}>
           <SceneContent />
         </ScrollControls>
       </Canvas>
