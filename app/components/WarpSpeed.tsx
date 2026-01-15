@@ -1,52 +1,46 @@
 "use client"
 import { useState, useRef, Suspense, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Stars, ScrollControls, useScroll, Text, Float, Sparkles, PerspectiveCamera, OrbitControls, MeshDistortMaterial } from '@react-three/drei'
+import { Stars, ScrollControls, useScroll, Text, Float, Sparkles, PerspectiveCamera, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 
-// --- 1. Real Gargantua Shader (අර රූපේ විදිහටම වලල්ල පේන්න) ---
+// --- Realistic Gargantua (Shader එක optimization කළා ලෝඩ් වෙන්න ලේසි වෙන්න) ---
 function Gargantua() {
   const diskRef = useRef<THREE.Mesh>(null!)
   
   useFrame((state) => {
-    diskRef.current.rotation.z = state.clock.getElapsedTime() * 0.2
+    if (diskRef.current) {
+      diskRef.current.rotation.z += 0.01 // හෙමින් කැරකෙන ගතිය
+    }
   })
 
   return (
     <group position={[0, 0, 0]}>
-      {/* කළු කුහරයේ මැද (Event Horizon) */}
+      {/* 1. මධ්‍යයේ කළු බෝලය */}
       <mesh>
-        <sphereGeometry args={[5, 64, 64]} />
+        <sphereGeometry args={[5, 32, 32]} />
         <meshBasicMaterial color="black" />
       </mesh>
 
-      {/* Accretion Disk - රූපේ තියෙන විදිහටම වලල්ල පේන්න */}
+      {/* 2. Accretion Disk - රූපේ විදිහටම දිලිසෙන වලල්ල */}
       <mesh ref={diskRef} rotation={[Math.PI / 2.1, 0, 0]}>
-        <torusGeometry args={[11, 1.5, 2, 120]} />
+        <torusGeometry args={[10, 1.2, 2, 80]} />
         <meshStandardMaterial 
           color="#ff8800" 
           emissive="#ff4400" 
-          emissiveIntensity={15} 
+          emissiveIntensity={10} 
           transparent 
           opacity={0.9} 
         />
       </mesh>
 
-      {/* Gravitational Lensing (ආලෝකය නැවෙන ගතිය) */}
+      {/* 3. Outer Glow (Gravitational Lensing) */}
       <mesh>
-        <sphereGeometry args={[12, 64, 64]} />
-        <MeshDistortMaterial
-          color="#ffaa00"
-          speed={3}
-          distort={0.4}
-          radius={1}
-          transparent
-          opacity={0.15}
-          side={THREE.BackSide}
-        />
+        <sphereGeometry args={[11, 32, 32]} />
+        <meshBasicMaterial color="#ffaa00" transparent opacity={0.1} side={THREE.BackSide} />
       </mesh>
       
-      <Sparkles count={4000} scale={40} size={2.5} speed={1.5} color="#ffaa00" />
+      <Sparkles count={2000} scale={30} size={2} speed={1} color="#ffaa00" />
     </group>
   )
 }
@@ -56,76 +50,64 @@ function SceneContent() {
   const { camera } = useThree()
   
   useFrame(() => {
-    // Scroll එකෙන් ඇතුළට යන එක පාලනය වෙනවා
+    // Zoom in/out based on scroll
     camera.position.z = THREE.MathUtils.lerp(camera.position.z, 60 - scroll.offset * 120, 0.05)
   })
 
   return (
     <>
       <color attach="background" args={['#000']} />
-      <ambientLight intensity={1.5} />
-      <pointLight position={[0, 0, 0]} intensity={30} color="#ffaa00" />
-      <Stars radius={500} count={50000} factor={10} fade speed={2} />
+      {/* Lights වැඩි කරා Dark Screen එක නැති කරන්න */}
+      <ambientLight intensity={2} />
+      <pointLight position={[0, 0, 0]} intensity={20} color="#ffaa00" />
+      <Stars radius={400} count={20000} factor={8} fade speed={1.5} />
       
-      {/* 360 MOUSE VIEW (Orbit Controls) - මේක තමයි මවුස් එකෙන් කැරකෙන්න දෙන්නේ */}
-      <OrbitControls 
-        enableZoom={false} 
-        enablePan={false} 
-        makeDefault 
-        rotateSpeed={0.5}
-      />
+      {/* 360 Camera View */}
+      <OrbitControls enableZoom={false} enablePan={false} makeDefault />
 
       <Gargantua />
 
-      {/* Content Section */}
       <group position={[0, 0, -80]}>
         <Float>
-          <Text fontSize={4} color="#00d4ff" textAlign="center" font="/fonts/neon.ttf">
-            NEXT WEB{"\n"}SOLUTIONS
-          </Text>
+          <Text fontSize={4} color="#00d4ff" textAlign="center">NEXT WEB{"\n"}SOLUTIONS</Text>
         </Float>
       </group>
     </>
   )
 }
 
-export default function InterstellarApp() {
+export default function App() {
   const [hasEntered, setHasEntered] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Music ප්ලේ වෙන්නෙත් බටන් එක එබුවමයි
-  const startExperience = () => {
-    setHasEntered(true)
-    if (audioRef.current) {
-      audioRef.current.play().catch(e => console.log("Music Error: ", e))
-    }
-  }
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted) return null
 
   return (
     <main className="w-full h-screen bg-black overflow-hidden relative">
-      {/* Music file එක 'public' folder එකේ 'interstellar.mp3' නමින් තිබිය යුතුයි */}
       <audio ref={audioRef} src="/interstellar.mp3" loop />
 
       {!hasEntered ? (
-        // --- Intro Screen ---
-        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#010105]">
-          <h1 className="text-6xl md:text-9xl font-black text-white text-center mb-10 tracking-tighter uppercase">
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black">
+          <h1 className="text-6xl md:text-8xl font-black text-white text-center mb-10 tracking-tighter">
             NEXT WEB<br/><span className="text-[#00d4ff]">SOLUTIONS</span>
           </h1>
           <button 
-            onClick={startExperience}
-            className="px-16 py-6 border-2 border-[#ffaa00] text-[#ffaa00] font-bold tracking-[10px] hover:bg-[#ffaa00] hover:text-black transition-all duration-700 uppercase"
+            onClick={() => { setHasEntered(true); audioRef.current?.play(); }}
+            className="px-14 py-5 border-2 border-[#ffaa00] text-[#ffaa00] font-bold tracking-[8px] hover:bg-[#ffaa00] hover:text-black transition-all duration-500"
           >
-            Enter The Future
+            ENTER THE FUTURE
           </button>
         </div>
       ) : (
-        // --- 3D Canvas ---
         <div className="absolute inset-0 z-10">
-          <Canvas dpr={[1, 2]}>
+          <Canvas dpr={[1, 1.5]} camera={{ position: [0, 10, 60], fov: 75 }}>
             <Suspense fallback={null}>
-              <PerspectiveCamera makeDefault fov={75} position={[0, 10, 60]} />
-              <ScrollControls pages={10} damping={0.25}>
+              <ScrollControls pages={6} damping={0.2}>
                 <SceneContent />
               </ScrollControls>
             </Suspense>
