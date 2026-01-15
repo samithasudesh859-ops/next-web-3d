@@ -1,5 +1,5 @@
 "use client"
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Stars, ScrollControls, useScroll, Text, Sphere, Float, Sparkles, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
@@ -44,17 +44,13 @@ function SceneContent() {
 }
 
 export default function WarpBackground() {
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [hasEntered, setHasEntered] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const toggleMusic = () => {
+  const handleEnter = () => {
+    setHasEntered(true)
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause()
-      } else {
-        audioRef.current.play().catch(e => console.error("Playback failed", e))
-      }
-      setIsPlaying(!isPlaying)
+      audioRef.current.play().catch(e => console.error("Audio failed", e))
     }
   }
 
@@ -62,33 +58,33 @@ export default function WarpBackground() {
     <div className="fixed inset-0 h-screen w-screen bg-[#010105]">
       <audio ref={audioRef} src="/interstellar.mp3" loop />
 
-      {/* 🔘 මේක තමයි මියුසික් බටන් එක */}
-      <button 
-        onClick={toggleMusic}
-        style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          zIndex: 9999,
-          padding: '12px 24px',
-          background: 'transparent',
-          color: '#00d4ff',
-          border: '2px solid #00d4ff',
-          borderRadius: '30px',
-          cursor: 'pointer',
-          fontWeight: 'bold',
-          letterSpacing: '1px'
-        }}
-      >
-        {isPlaying ? "PAUSE MISSION" : "PLAY MISSION"}
-      </button>
+      {/* 🌟 Intro Neon Screen */}
+      {!hasEntered && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black transition-opacity duration-1000">
+           <div className="absolute inset-0 bg-[#00d4ff] opacity-5 blur-[100px]" />
+           <h1 className="text-6xl font-bold text-white tracking-tighter mb-2 drop-shadow-[0_0_15px_rgba(0,212,255,0.8)]">
+             NEXT WEB SOLUTIONS
+           </h1>
+           <p className="text-[#ff00ea] tracking-[10px] uppercase text-sm mb-12">The Future is Here</p>
+           
+           <button 
+             onClick={handleEnter}
+             className="px-8 py-3 border-2 border-[#00d4ff] text-[#00d4ff] hover:bg-[#00d4ff] hover:text-black transition-all duration-300 font-bold tracking-widest rounded-sm"
+           >
+             ENTER THE FUTURE
+           </button>
+        </div>
+      )}
 
-      <Canvas gl={{ antialias: false }}>
-        <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={90} />
-        <ScrollControls pages={12} damping={0.3}>
-          <SceneContent />
-        </ScrollControls>
-      </Canvas>
+      {/* 🚀 Main 3D Experience (Loading after entry) */}
+      {hasEntered && (
+        <Canvas gl={{ antialias: false }}>
+          <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={90} />
+          <ScrollControls pages={12} damping={0.3}>
+            <SceneContent />
+          </ScrollControls>
+        </Canvas>
+      )}
     </div>
   )
 }
