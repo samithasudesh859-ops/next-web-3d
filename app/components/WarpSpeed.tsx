@@ -1,89 +1,137 @@
 "use client"
-import { useState, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Stars, ScrollControls, useScroll, Text, Sphere, Float, Sparkles, PerspectiveCamera } from '@react-three/drei'
+import { useState, useRef, Suspense, useEffect } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Stars, ScrollControls, useScroll, Text, Float, Sparkles, PerspectiveCamera, OrbitControls, MeshDistortMaterial } from '@react-three/drei'
 import * as THREE from 'three'
+
+// --- 1. Real Gargantua Shader (අර රූපේ විදිහටම වලල්ල පේන්න) ---
+function Gargantua() {
+  const diskRef = useRef<THREE.Mesh>(null!)
+  
+  useFrame((state) => {
+    diskRef.current.rotation.z = state.clock.getElapsedTime() * 0.2
+  })
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* කළු කුහරයේ මැද (Event Horizon) */}
+      <mesh>
+        <sphereGeometry args={[5, 64, 64]} />
+        <meshBasicMaterial color="black" />
+      </mesh>
+
+      {/* Accretion Disk - රූපේ තියෙන විදිහටම වලල්ල පේන්න */}
+      <mesh ref={diskRef} rotation={[Math.PI / 2.1, 0, 0]}>
+        <torusGeometry args={[11, 1.5, 2, 120]} />
+        <meshStandardMaterial 
+          color="#ff8800" 
+          emissive="#ff4400" 
+          emissiveIntensity={15} 
+          transparent 
+          opacity={0.9} 
+        />
+      </mesh>
+
+      {/* Gravitational Lensing (ආලෝකය නැවෙන ගතිය) */}
+      <mesh>
+        <sphereGeometry args={[12, 64, 64]} />
+        <MeshDistortMaterial
+          color="#ffaa00"
+          speed={3}
+          distort={0.4}
+          radius={1}
+          transparent
+          opacity={0.15}
+          side={THREE.BackSide}
+        />
+      </mesh>
+      
+      <Sparkles count={4000} scale={40} size={2.5} speed={1.5} color="#ffaa00" />
+    </group>
+  )
+}
 
 function SceneContent() {
   const scroll = useScroll()
-  const meshRef = useRef<THREE.Mesh>(null!)
-
-  useFrame((state) => {
-    if (!scroll) return
-    const targetZ = 10 - (scroll.offset * 100)
-    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, targetZ, 0.05)
-    
-    const angleX = state.mouse.x * Math.PI * 0.5
-    const angleY = state.mouse.y * Math.PI * 0.2
-    
-    state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, Math.sin(angleX) * 10, 0.05)
-    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, angleY * 5, 0.05)
-    state.camera.lookAt(0, 0, targetZ - 20)
-    if (meshRef.current) meshRef.current.rotation.y += 0.005
+  const { camera } = useThree()
+  
+  useFrame(() => {
+    // Scroll එකෙන් ඇතුළට යන එක පාලනය වෙනවා
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, 60 - scroll.offset * 120, 0.05)
   })
 
   return (
     <>
-      <Stars radius={200} depth={100} count={15000} factor={8} saturation={1} fade speed={1.5} />
-      <Sparkles count={600} scale={30} size={3} speed={0.6} color="#ff00ea" />
-      <Sparkles count={600} scale={30} size={3} speed={0.6} color="#00d4ff" />
-      <Float speed={3} rotationIntensity={1} floatIntensity={2}>
-        <Sphere ref={meshRef} args={[2, 32, 32]} position={[0, 0, -10]}>
-          <meshBasicMaterial color="#00d4ff" wireframe opacity={0.4} transparent />
-        </Sphere>
-      </Float>
-      <Text fontSize={1.2} color="white" position={[0, 2, -5]}>DISCOVER 2036</Text>
-      <Text fontSize={0.8} color="white" position={[0, 0, -90]}>WELCOME TO THE NEW ERA</Text>
+      <color attach="background" args={['#000']} />
+      <ambientLight intensity={1.5} />
+      <pointLight position={[0, 0, 0]} intensity={30} color="#ffaa00" />
+      <Stars radius={500} count={50000} factor={10} fade speed={2} />
+      
+      {/* 360 MOUSE VIEW (Orbit Controls) - මේක තමයි මවුස් එකෙන් කැරකෙන්න දෙන්නේ */}
+      <OrbitControls 
+        enableZoom={false} 
+        enablePan={false} 
+        makeDefault 
+        rotateSpeed={0.5}
+      />
+
+      <Gargantua />
+
+      {/* Content Section */}
+      <group position={[0, 0, -80]}>
+        <Float>
+          <Text fontSize={4} color="#00d4ff" textAlign="center" font="/fonts/neon.ttf">
+            NEXT WEB{"\n"}SOLUTIONS
+          </Text>
+        </Float>
+      </group>
     </>
   )
 }
 
-export default function WarpBackground() {
+export default function InterstellarApp() {
   const [hasEntered, setHasEntered] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const handleEnter = (e: React.MouseEvent) => {
-    e.stopPropagation() // වෙනත් Click වලට බාධා නොවන ලෙස
+  // Music ප්ලේ වෙන්නෙත් බටන් එක එබුවමයි
+  const startExperience = () => {
     setHasEntered(true)
     if (audioRef.current) {
-      audioRef.current.play().catch(err => console.log("Play failed", err))
+      audioRef.current.play().catch(e => console.log("Music Error: ", e))
     }
   }
 
   return (
-    <div className="fixed inset-0 h-screen w-screen bg-black overflow-hidden">
+    <main className="w-full h-screen bg-black overflow-hidden relative">
+      {/* Music file එක 'public' folder එකේ 'interstellar.mp3' නමින් තිබිය යුතුයි */}
       <audio ref={audioRef} src="/interstellar.mp3" loop />
 
       {!hasEntered ? (
-        <div className="relative z-[9999] flex flex-col items-center justify-center h-full w-full bg-[#010105]">
-          {/* Animated Glow BG */}
-          <div className="absolute inset-0 bg-radial-gradient from-[#003344] to-black opacity-30 animate-pulse" />
-          
-          <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-2 drop-shadow-[0_0_20px_rgba(0,212,255,0.6)]">
-            NEXT WEB <span className="text-[#00d4ff]">SOLUTIONS</span>
+        // --- Intro Screen ---
+        <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-[#010105]">
+          <h1 className="text-6xl md:text-9xl font-black text-white text-center mb-10 tracking-tighter uppercase">
+            NEXT WEB<br/><span className="text-[#00d4ff]">SOLUTIONS</span>
           </h1>
-          <p className="text-[#ff00ea] tracking-[12px] uppercase text-xs md:text-sm mb-16 opacity-80">
-            Beyond the Digital Frontier
-          </p>
-          
           <button 
-            onClick={handleEnter}
-            className="group relative px-10 py-4 overflow-hidden border-2 border-[#00d4ff] transition-all duration-300 active:scale-95"
+            onClick={startExperience}
+            className="px-16 py-6 border-2 border-[#ffaa00] text-[#ffaa00] font-bold tracking-[10px] hover:bg-[#ffaa00] hover:text-black transition-all duration-700 uppercase"
           >
-            <span className="relative z-10 text-[#00d4ff] font-bold tracking-[4px] group-hover:text-black">
-              ENTER THE FUTURE
-            </span>
-            <div className="absolute inset-0 bg-[#00d4ff] transform translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+            Enter The Future
           </button>
         </div>
       ) : (
-        <Canvas gl={{ antialias: false }}>
-          <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={90} />
-          <ScrollControls pages={12} damping={0.3}>
-            <SceneContent />
-          </ScrollControls>
-        </Canvas>
+        // --- 3D Canvas ---
+        <div className="absolute inset-0 z-10">
+          <Canvas dpr={[1, 2]}>
+            <Suspense fallback={null}>
+              <PerspectiveCamera makeDefault fov={75} position={[0, 10, 60]} />
+              <ScrollControls pages={10} damping={0.25}>
+                <SceneContent />
+              </ScrollControls>
+            </Suspense>
+          </Canvas>
+        </div>
       )}
-    </div>
+    </main>
   )
 }
